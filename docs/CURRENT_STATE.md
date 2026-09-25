@@ -1,92 +1,75 @@
 # Current Project State
 
-Last updated: 2026-09-24
+Last updated: 2026-09-24. Revision checked: `ac8c2ba` on `main`; documentation changes are in the working tree.
 
 ## Current Phase
 
-The schedule helpers and normalizers are committed. Working-tree CSV loaders and a trace script now run successfully against a downloaded MBTA feed. No implementation milestone has been accepted or recorded.
+The author supplied and accepted `docs/ROADMAP.md` as the project scope and sequence. Phase 0 (GTFS foundations) is substantially implemented: static GTFS helpers, normalizers, CSV loaders, and a one-trip MBTA trace are committed. Phase 1 (static collection and versioning) has an accepted snapshot-selection rule and initial selector, but no collector or integrated archive. No phase has been recorded as formally accepted.
 
 ## Completed
 
-- Project goal and target architecture are documented in `PROJECT_BRIEF.md` and `ARCHITECTURE.md`. These are targets, not evidence of implemented pipeline behavior.
-- Commit `12e9221` tracks the time and service-date helpers. This is an implementation checkpoint, not milestone acceptance.
-- Commit `18fbe60` tracks the trip helpers, nine trip-helper tests, and the schedule composition function.
-- Commit `3ddd08e` tracks `gtfs_normalize.py`, the time/date/schedule and normalization tests, and ignores `data/raw`. The working tree was clean before this state reconciliation.
+- `12e9221`: GTFS time and service-date helpers.
+- `18fbe60`: trip helpers and schedule composition.
+- `3ddd08e`: GTFS normalizers and associated tests.
+- `ac8c2ba`: four CSV loaders, trace script, loader/trace tests, snapshot-selection design, and initial selector.
+- `docs/ROADMAP.md` now records the author's full Phase 0–20 roadmap, six-week milestone outline, ownership, and success criteria. Its dates are targets, not evidence of delivered capabilities.
+- The accepted rule uses an agency-local midnight cutoff, inclusive `feed_info.txt` coverage, timezone-aware UTC receipt times, SHA-256 identity for original ZIP bytes, separate receipts, and separately identified later revisions. This is design acceptance, not feature completion.
 
 ## In Progress
 
-- Untracked `gtfs_load.py` reads four CSV tables through the normalizers; untracked `trace_schedule.py` traces one hardcoded service date and trip.
-- The author reports explaining the real-feed trace with Mentor and handling the empty-visit case. Tester added focused loader/trace tests. Independent review and author milestone acceptance remain.
-- The author and Mentor proposed a rule for choosing the static schedule snapshot for an original historical report; it is recorded in `docs/plans/schedule-snapshot-selection.md` and has not been accepted or implemented.
+- `select_schedule_snapshot` filters in-memory snapshot records by coverage and cutoff and chooses the latest receipt. It does not yet validate the accepted metadata contract or handle every unresolved condition.
+- The trace still uses a hardcoded local feed path, date, and trip. It does not select an archived ZIP, record hash/receipt provenance, or produce a stable report/revision identity. The existing 45-visit trace remains an unversioned demonstration.
 
 ## Blocked
 
-- None confirmed.
+- None confirmed for core selector development: Conda Python runs the selector with `America/New_York`. Portability to `C:\Python314\python.exe` needs a documented IANA timezone-data dependency.
 
 ## Needs Verification
 
-- No roadmap or accepted first milestone exists. The snapshot-selection plan is a proposal, not an accepted architecture decision.
-- The time parser's current extended-hour and malformed-string behavior is tested but has not been recorded as an author-accepted contract.
-- The normalizers convert raw string dates, flags, exception types, and stop sequences to the helper inputs. Their required-key, blank-ID, reversed-range, duplicate/conflict, and blank-time policies remain limited or unspecified.
-- The trip tests deliberately leave malformed rows, duplicate identifiers/sequences, CSV coercion, and deep-copy guarantees unspecified.
-- The schedule function returns a `defaultdict`, which is a `dict` subclass; the annotation alone is not a defect. Missing-key behavior remains a public-interface choice.
-- The tests and bounded normalization changes include agent work; no repository evidence yet records the author's review and acceptance of consequential semantic assumptions.
-- The author's source-row explanation was reported in chat but is not recorded in a repository artifact; mark that understanding NEEDS VERIFICATION until a short written trace or equivalent evidence exists.
-- The proposal now specifies one collector, UTC receipt timestamps, SHA-256 ZIP identity, separate receipt records, content-based extraction directories, and reporting an actual same-time distinct-content ambiguity. Coverage, timestamp precision/timezone source, and report-revision identity still need resolution before implementation. The midnight cutoff has not been checked against MBTA publication patterns.
+- Phase 0's completion criteria require a program accepting a service date. The current trace hardcodes date/trip/path; helper functions accept a date, but the end-to-end input criterion remains unverified.
+- Phase 1's collector, immutable archive, queryable metadata, and versioned trace are not implemented. The roadmap's sample metadata is illustrative; the accepted snapshot-selection decision governs detailed semantics.
+- Committed selector implementation passes five direct in-memory timezone examples under Conda Python, but dedicated tests and independent review are absent. A missing `feed_start_date` key raises `KeyError` instead of making coverage ineligible. Distinct contents with equal receipt times currently fall through to input order; the accepted first-version rule deliberately leaves that tie undefined, so report it for author judgment if observed.
+- UTC awareness/precision, source `agency_timezone`, ZIP content identity, receipt records, archive immutability, and original/revision identity are specified but not enforced by the current selector or trace.
+- Earlier helper/normalizer input policies remain limited or unspecified: malformed or duplicate rows, conflicting exceptions, and exact `dict` versus `defaultdict` behavior. Author acceptance of consequential generated behavior is not recorded.
+- The author reported explaining the source rows behind the real-feed trace with Mentor, but no durable source-row explanation or independent review is recorded.
 
 ## Test Status
 
-- PASS: Direct `python -B -c` checks returned `45296` for `parse_gtfs_time('12:34:56')` and `90600` for `parse_gtfs_time('25:10:00')`.
-- PASS: Direct `python -B -c` checks of `active_service_ids` with in-memory typed rows returned `{'WK'}` for normal service, `set()` after removal, and `{'EX'}` for an addition.
-- PASS: `python -B -m unittest discover -s tests -v` ran all 41 committed tests successfully on Python 3.14.3, including an in-memory raw-string normalization-to-schedule integration case.
-- PASS: `python -B -m unittest discover -s tests -q` rerun on September 22: 41 tests passed. No dedicated loader/trace tests are present.
-- PASS: `python -B -c "import sys; sys.path.insert(0,'src'); from schedule_truth.trace_schedule import main; main()"` ran against `data/raw/MBTA_GTFS`: trip `78942566` on `2026-09-22` has 45 visits, from stop `1747` at `19:10:00` to stop `797` at `20:03:00`.
-- PASS: `python -B -m unittest discover -s tests -q` ran 55 tests on September 23 when Windows Temp was writable; 14 new loader/trace tests cover CSV decoding, normalization errors, empty visits, inactive trips, and source preservation.
-- ENVIRONMENT FAILURE: The sandboxed run of the same command produced 40 temporary-directory access errors. It does not establish a code failure; the approved rerun passed.
-- NOT RUN: Independent review, lint, and cases outside the current input contract. The successful actual-feed trace remains one feed/date/trip example.
+- PASS: `python -B -m unittest discover -s tests -q` ran 55 tests on 2026-09-24 outside the sandbox. The same sandboxed command encountered 40 Windows Temp permission errors; that run did not establish code failures.
+- PASS (prior check): The trace against `data/raw/MBTA_GTFS` returned 45 visits for trip `78942566` on 2026-09-22, from stop `1747` at `19:10:00` to stop `797` at `20:03:00`.
+- PASS: Direct selector checks with `C:\Users\EricChen\miniconda3\python.exe -B -c ...` on 2026-09-24 passed five in-memory examples: newer eligible receipt, after-midnight exclusion, exact-midnight inclusion, no eligible snapshot, and winter UTC offset. These are smoke checks, not committed tests.
+- FAIL: A direct Conda-Python selector check with missing `feed_start_date` raised `KeyError`; the accepted decision makes unknown coverage ineligible.
+- ENVIRONMENT LIMIT: The same selector cannot run under `C:\Python314\python.exe` because `ZoneInfo("America/New_York")` raises `ZoneInfoNotFoundError`; that interpreter has empty `TZPATH` and no `tzdata` package. The limitation is interpreter-specific.
+- NOT RUN: Committed selector-specific tests, versioned trace integration, independent review, and lint. No selector tests are present in `tests/`.
 
-## Important Findings
+## Important Findings and Risks
 
-- Time tests cover integer seconds, extended hours, malformed components, widths/ranges, signs, whitespace, fractions, and non-ASCII digits.
-- Date tests cover every weekday, inclusive ranges, disabled service, additions/removals, exception-only service, input preservation, and repeatability.
-- Schedule tests exercise the public function with real helpers, including ordinary and exception service, ordered stops, inactive/orphan exclusion, empty results, input preservation, and repeatability.
-- The trip implementation and tests are committed in `18fbe60`; the passing suite was rerun against that commit.
-- `README.md`, `DATA_MODEL.md`, `FAILURE_MODES.md`, and `LEARNING.md` are empty.
-- The time/date/schedule and normalization tests are tracked in `3ddd08e`; the full suite was rerun against that commit.
-- The trace now distinguishes an active trip with no stop rows from a trip that is not scheduled; the dedicated test passes. This resolves the earlier empty-list finding.
-- The trace hardcodes feed path, date, and trip; the CSV loaders do not add file/row context to normalization errors.
-- `docs/ROADMAP.md`, Python project configuration, and accepted decisions are absent. A proposed snapshot-selection plan now exists.
-
-## Current Technical Risks
-
-- The repository has no defined package/dependency setup; tests currently modify `sys.path` to import the source tree.
-- GTFS times can exceed 24 hours; the parser contract should explicitly cover this and malformed inputs.
-- Actual CSV loading and schedule composition pass for one MBTA trace; broader feed behavior and a durable identity for the input snapshot remain unverified.
-- The suite does not establish missing-field, reversed-range, conflicting-exception, duplicate, maximum-hour, non-string parser input, deep-copy, or exact `dict` versus `defaultdict` policies.
+- Loader/trace tests cover UTF-8 CSV loading, normalization failures, empty visits, inactive trips, and source preservation. They do not establish snapshot identity or archive behavior.
+- The selector's current unresolved result is a generic reason; the accepted plan calls for a recorded reason when no snapshot qualifies.
+- The repository has no defined Python package/dependency setup. `README.md`, `DATA_MODEL.md`, `FAILURE_MODES.md`, and `LEARNING.md` are empty.
+- A single current-feed trace does not establish historical reproducibility or fit of the midnight cutoff with MBTA publication patterns.
 
 ## Learning Progress
 
-Documented project concepts:
-- The brief identifies schedule versioning, immutable raw data, replay, and feed health as central design concerns.
-
-Needs deeper understanding:
-- No repository evidence yet records the author's understanding of GTFS time semantics or the core reconciliation decisions.
+- The accepted snapshot decision records the author's reasoning about evidence availability, local-midnight cutoffs, coverage, identical ZIP content, and revisions.
+- Understanding of source-row tracing and later reconciliation decisions still needs durable evidence as those parts are implemented.
 
 ## Next Recommended Work
 
 ### Human-led engineering
 
-1. MUST — Resolve the snapshot proposal's coverage rule, timestamp precision/timezone source, and report-revision identity; decide whether to accept the completed rule. Stop when covered no-service and uncovered dates are distinct and selection outcomes are explicit.
-2. SHOULD — After accepting the rule, implement a small author-owned selector over archive metadata and connect the chosen ZIP hash to the existing loader/trace path. Stop when the September 22 A/B and no-eligible-snapshot cases have reproducible outcomes.
-3. STRETCH — Record the source-row reasoning for the existing 45-visit trace so the reported understanding has durable evidence; keep it short and link it to the currently unversioned feed path.
+1. MUST — Continue Phase 1 by finishing the author-owned selector contract for accepted snapshot metadata: valid coverage, UTC receipts, exact cutoff, repeated content, and explicit unresolved outcomes. Stop when the accepted examples have clear results; bring any observed equal-time distinct-content tie to Mentor for a decision.
+2. SHOULD — Define the smallest immutable archive/receipt interface and connect a selected hash and receipt to trace input and result. Stop at one reproducible versioned static trace; keep the current unversioned example honestly labeled.
+3. STRETCH — Make Phase 0's trace accept a service date and record a short source-row explanation, then assess Phase 0 against its roadmap completion criteria.
 
 ### Verification and support work
 
-- Loader/trace test support: 14 focused tests are implemented and passed; the test files remain untracked. Their scope excludes feed snapshot identity and several malformed-header/duplicate policies.
-- Independent review (proposed): assess `3ddd08e` plus untracked loader, trace, and test files; report concrete findings and consequential choices before static-trace milestone acceptance.
-- Mechanical support (proposed): after the author accepts a versioned-feed interface, add bounded archive metadata and parameterized feed/date/trip plumbing without choosing historical semantics.
-- State maintenance: current test and trace evidence reconciled; proposed review and support have not been launched by this update.
+- Tester (proposed): add focused selector cases for cutoff and daylight-saving boundaries, coverage boundaries/invalidity, repeated hashes, and unresolved outcomes; run the suite and report reproductions. Do not choose core semantics.
+- Reviewer (proposed): independently assess the accepted ADR against selector, tests, and trace integration; report concrete gaps and assumptions. Review is not yet launched.
+- Builder (proposed, after interface agreement): handle bounded archive metadata and parameterized path plumbing without choosing selection or revision semantics.
+- Runtime support (proposed): declare an IANA timezone-data dependency for `C:\Python314\python.exe` and verify `America/New_York` loads there; Conda Python already works.
+- State maintenance: this file reconciles `ac8c2ba` and the 2026-09-24 test run.
 
 ## Roadmap Impact
 
-- `ROADMAP.md` is absent. The proposed schedule-helper milestone now has 55 passing tests, a successful actual-feed trace, and explicit empty-visit handling. Independent review, durable source-row explanation, and author acceptance remain. Historical snapshot selection is documented as a proposal; whole-project estimates still need a bounded portfolio endpoint.
+The accepted roadmap establishes Phase 0–20, with Phases 17–19 conditional on demonstrated need and a six-week core portfolio sequence. Current position is late Phase 0 / early Phase 1: static schedule behavior is implemented and tested within current scope, but Phase 0's parameterized input and formal acceptance remain; Phase 1 design is accepted and its selector is initial, without collection or versioned integration. Realtime archiving, feed health, reconciliation/reconstruction, replay, analytics, and operational hardening remain ahead. The roadmap is a scope baseline, not evidence that its six-week pace is already achieved.

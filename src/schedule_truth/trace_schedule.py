@@ -8,11 +8,10 @@ from schedule_truth.gtfs_load import (
     load_stop_time_rows,
 )
 from schedule_truth.gtfs_schedule import scheduled_stop_times_for_date
+from schedule_truth.select_schedule_snapshot import select_schedule_snapshot
 
-def main():
-    feed_path =  Path("data/raw/MBTA_GTFS")
-    service_date = date(2026, 9, 22)
-    trip_id = "78942566"
+def main(feed_path: Path, service_date: date, trip_id: str):
+
 
     calendar_rows = load_calendar_rows(feed_path / "calendar.txt")
     calendar_dates_rows = load_calendar_exception_rows(feed_path / "calendar_dates.txt")
@@ -31,5 +30,17 @@ def main():
         print(f"Trip {trip_id} has {len(visits)} visits, starting at stop {starting_stop} at {starting_time} and ending at stop {ending_stop} at {ending_time}.")
     else:
         print('The trip is not scheduled on this date.')
+
+def trace_from_archive(archive_root: Path, service_date: date, trip_id: str, snapshots: list[dict], agency_timezone: str):
+     res = select_schedule_snapshot(service_date, snapshots, agency_timezone)
+     if res['status'] == 'unresolved':
+         print("There are no eligible snapshots.")
+         return 
+     else:
+         zip_sha256 = res["snapshot"]['zip_sha256']
+     feed_path = archive_root / zip_sha256
+     print(f"The selected path is {feed_path}, downloaded at {res['snapshot']['downloaded_at_utc']} utc.")
+     main(feed_path, service_date, trip_id)
+
 if __name__ == "__main__":
-    main()
+    main(Path("data/raw/MBTA_GTFS"), date(2026, 9, 22), "78942566")
