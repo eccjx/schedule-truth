@@ -1,6 +1,6 @@
 # Schedule snapshot selection
 
-Status: ACCEPTED by the author on 2026-09-24 after review with Mentor. This is a design rule, not an implemented feature.
+Status: ACCEPTED by the author on 2026-09-24, with the coverage-retention refinement accepted on 2026-09-28. Selection and local archiving are partially implemented; see CURRENT_STATE.md for verified feature status.
 
 ## Original report for service date D
 
@@ -24,6 +24,10 @@ The cutoff is an evidence-availability rule. It does not assume that every trip 
 ## Coverage of a service date
 
 For this first version, use `feed_start_date` and `feed_end_date` from `feed_info.txt` as the snapshot's inclusive coverage range. A date inside that range is covered even when the schedule helpers find no active trips. A date outside the range makes the snapshot ineligible. If either coverage date is missing, blank, or invalid, treat coverage as unknown and do not select that snapshot for the original historical report. Do not infer coverage from calendar rows in this version.
+
+Accepted archive refinement on 2026-09-28: retain the original ZIP and each receipt even when coverage is unknown. Persist both coverage dates as null and a nonempty `coverage_error`. Coverage strings must be exactly eight ASCII digits in YYYYMMDD form, parse to real dates, and form a non-reversed range. Retaining evidence does not make it eligible.
+
+Accepted agency handling on 2026-09-29: choose the MBTA row rather than the first `agency.txt` row. For a missing MBTA row or missing/invalid MBTA timezone, retain the ZIP and receipt, store `America/New_York` as a configured fallback, and record source and reason. Duplicate MBTA rows and corrupt-ZIP persistence remain undecided. Automatic retained-ZIP integrity checking is deferred and prevents Phase 1 acceptance while the known mismatch remains; see `docs/FAILURE_MODES.md`.
 
 ## Archive identity and trace input
 

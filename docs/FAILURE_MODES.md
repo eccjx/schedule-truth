@@ -1,0 +1,5 @@
+# Known archive integrity limitation
+
+**Retained ZIP changed after archiving — deferred by the author on 2026-09-29.** The archive identifies ZIP contents by SHA-256, but the current extraction path does not recompute the retained `original.zip` hash before tracing. If those bytes are replaced under the same hash-named directory, a trace can report the old hash and receipt while reading the replacement schedule. This was reproduced by `test_mismatched_retained_zip_cannot_be_traced_under_old_hash` in `tests/test_persisted_archive_independent.py`; it is a synthetic fault-injection case, not an observed MBTA download failure.
+
+The author chose to defer integrity detection and recovery for this case. Keep the regression test. The latest full run on 2026-09-29 has 90 tests with this one failure; the later agency-error wording fix resolved the other earlier failure. Do not treat a trace from altered retained bytes as verified provenance or accept Phase 1 while this critical integrity failure remains unresolved. Revisit by checking the retained ZIP's actual hash before extraction, then decide separately whether any recovery is needed.

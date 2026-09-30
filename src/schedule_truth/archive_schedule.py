@@ -6,6 +6,7 @@ import json
 import csv
 import io
 import zipfile
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 def archive_schedule_zip(
     zip_path: Path,
@@ -52,18 +53,39 @@ def archive_schedule_zip(
             feed_start_date = None
             feed_end_date = None
             coverage_error = f"missing or invalid coverage: {error}"
-        with archive.open("agency.txt") as member:
-             text = io.TextIOWrapper(member, encoding="utf-8-sig")
-             feed_info_rows = list(csv.DictReader(text))
-             timezone = feed_info_rows[0]['agency_timezone']
+        agency_timezone = "America/New_York"
+        agency_timezone_source = "configured_fallback"
+        agency_timezone_error = None
 
+        try:
+            with archive.open("agency.txt") as member:
+                text = io.TextIOWrapper(member, encoding="utf-8-sig")
+                agency_rows = list(csv.DictReader(text))
+                mbta_row = next(
+                    (row for row in agency_rows if row.get("agency_name") == "MBTA"),
+                    None,
+                )
+                if mbta_row is None:
+                    raise ValueError("MBTA agency row is missing")
+
+                supplied_timezone = mbta_row.get("agency_timezone")
+                if not supplied_timezone:
+                    raise ValueError("blank MBTA agency timezone")
+
+                ZoneInfo(supplied_timezone)
+                agency_timezone = supplied_timezone
+                agency_timezone_source = "agency.txt"
+        except (KeyError, IndexError, ValueError, ZoneInfoNotFoundError) as error:
+            agency_timezone_error = str(error)
         
     content = {
             "zip_sha256": zip_sha256,
             "zip_path": destination_path,
             "feed_start_date": feed_start_date,
             "feed_end_date": feed_end_date,
-            "agency_timezone": timezone,
+            "agency_timezone": agency_timezone,
+            "agency_timezone_source": agency_timezone_source,
+            "agency_timezone_error": agency_timezone_error,
         }
     if coverage_error:
          content['coverage_error'] = coverage_error
@@ -98,3 +120,50 @@ def archive_schedule_zip(
 
     
     return {"content": content, "receipt": receipt}
+
+
+def load_schedule_snapshots(archive_root: Path) -> list[dict]:
+    res = []
+    for receipt_path in (archive_root / "receipts").glob("*.json"):
+        with receipt_path.open("r", encoding="utf-8") as file:
+            receipt = json.load(file)
+        zip_sha256 = receipt['zip_sha256']
+        content_path = archive_root / zip_sha256 / "content.json"
+        with content_path.open("r", encoding="utf-8") as file:
+            content = json.load(file)
+        if content['zip_sha256'] != zip_sha256:
+            raise ValueError(f"Content hash does not match receipt: {receipt_path}")
+
+        snapshot = content.copy()
+        snapshot['zip_path'] = Path(content['zip_path'])
+        if content['feed_start_date'] is not None:
+            snapshot['feed_start_date'] = date.fromisoformat(content['feed_start_date'])
+        if content['feed_end_date'] is not None:
+            snapshot['feed_end_date'] = date.fromisoformat(content['feed_end_date'])
+        downloaded_at_utc = datetime.fromisoformat(receipt['downloaded_at_utc'])
+        offset = downloaded_at_utc.utcoffset()
+        if offset is None or offset.total_seconds() != 0:
+            raise ValueError(f"The downloaded time is not utc: {receipt_path}")
+        snapshot['receipt_id'] = receipt['receipt_id']
+        snapshot['downloaded_at_utc'] = downloaded_at_utc
+        res.append(snapshot)
+    return res
+
+
+def extract_schedule_zip(archive_root: Path, zip_sha256: str) -> Path:
+    content_path = archive_root / zip_sha256
+    feed_path = content_path / "feed"
+    with zipfile.ZipFile(content_path / "original.zip") as archive:
+        for member in archive.infolist():
+            destination = feed_path / member.filename
+            if not destination.resolve().is_relative_to(feed_path.resolve()):
+                raise ValueError(f"ZIP member is outside feed directory: {member.filename!r}")
+            if destination.exists():
+                continue
+            if member.is_dir():
+                destination.mkdir(parents=True, exist_ok=True)
+            else:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(member) as source, destination.open("xb") as target:
+                    target.write(source.read())
+    return feed_path

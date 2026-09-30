@@ -1,4 +1,4 @@
-"""Archive wrapper checks; main is mocked so no archived CSV is loaded."""
+"""Archive wrapper routing and a persisted archive-to-trace integration."""
 
 from contextlib import redirect_stdout
 from datetime import date, datetime, timezone
@@ -6,10 +6,13 @@ from io import StringIO
 from pathlib import Path
 import sys
 import unittest
+from tempfile import TemporaryDirectory
+import zipfile
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from schedule_truth import trace_schedule
+from schedule_truth.archive_schedule import archive_schedule_zip
 
 
 class TraceFromArchiveTests(unittest.TestCase):
@@ -22,6 +25,12 @@ class TraceFromArchiveTests(unittest.TestCase):
             "zip_sha256": "b" * 64, "downloaded_at_utc": self.receipt,
             "feed_start_date": date(2026, 9, 1), "feed_end_date": date(2026, 9, 30),
         }
+        self.loader = patch.object(trace_schedule, "load_schedule_snapshots", return_value=[self.selected]).start()
+        self.extractor = patch.object(
+            trace_schedule, "extract_schedule_zip",
+            side_effect=lambda root, digest: root / digest / "feed",
+        ).start()
+        self.addCleanup(patch.stopall)
 
     def test_selected_hash_path_arguments_and_receipt_are_forwarded_and_reported(self):
         rows = [self.selected]
@@ -29,9 +38,11 @@ class TraceFromArchiveTests(unittest.TestCase):
         with patch.object(trace_schedule, "select_schedule_snapshot", return_value={
             "status": "selected", "snapshot": self.selected,
         }) as selector, patch.object(trace_schedule, "main") as main, redirect_stdout(output):
-            trace_schedule.trace_from_archive(self.root, self.day, self.trip, rows, "America/New_York")
+            trace_schedule.trace_from_archive(self.root, self.day, self.trip, "America/New_York")
+        self.loader.assert_called_once_with(self.root)
+        self.extractor.assert_called_once_with(self.root, self.selected["zip_sha256"])
         selector.assert_called_once_with(self.day, rows, "America/New_York")
-        main.assert_called_once_with(self.root / self.selected["zip_sha256"], self.day, self.trip)
+        main.assert_called_once_with(self.root / self.selected["zip_sha256"] / "feed", self.day, self.trip)
         text = output.getvalue()
         self.assertIn(str(self.root / self.selected["zip_sha256"]), text)
         self.assertIn(self.selected["zip_sha256"], text)
@@ -39,13 +50,15 @@ class TraceFromArchiveTests(unittest.TestCase):
         self.assertIn("utc", text.lower())
 
     def test_unresolved_reports_outcome_without_calling_main(self):
+        self.loader.return_value = []
         output = StringIO()
         with patch.object(trace_schedule, "select_schedule_snapshot", return_value={
             "status": "unresolved", "reason": "no eligible snapshot",
         }) as selector, patch.object(trace_schedule, "main") as main, redirect_stdout(output):
-            trace_schedule.trace_from_archive(self.root, self.day, self.trip, [], "America/New_York")
+            trace_schedule.trace_from_archive(self.root, self.day, self.trip, "America/New_York")
         selector.assert_called_once_with(self.day, [], "America/New_York")
         main.assert_not_called()
+        self.extractor.assert_not_called()
         self.assertIn("no eligible snapshots", output.getvalue().lower())
         self.assertNotIn("selected path", output.getvalue().lower())
 
@@ -55,11 +68,39 @@ class TraceFromArchiveTests(unittest.TestCase):
         late = dict(self.selected, zip_sha256="c" * 64,
                     downloaded_at_utc=datetime(2026, 9, 22, 4, 0, 0, 1, tzinfo=timezone.utc))
         output = StringIO()
+        self.loader.return_value = [late, older, self.selected]
         with patch.object(trace_schedule, "main") as main, redirect_stdout(output):
-            trace_schedule.trace_from_archive(self.root, self.day, self.trip,
-                                              [late, older, self.selected], "America/New_York")
-        main.assert_called_once_with(self.root / self.selected["zip_sha256"], self.day, self.trip)
+            trace_schedule.trace_from_archive(self.root, self.day, self.trip, "America/New_York")
+        main.assert_called_once_with(self.root / self.selected["zip_sha256"] / "feed", self.day, self.trip)
         self.assertIn(str(self.receipt), output.getvalue())
+
+
+class PersistedArchiveTraceTests(unittest.TestCase):
+    def test_trace_uses_disk_receipts_and_extracts_only_selected_content(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.zip"
+            archive_root = root / "archive"
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("feed_info.txt", "feed_start_date,feed_end_date\n20260901,20260930\n")
+                archive.writestr("agency.txt", "agency_timezone\nAmerica/New_York\n")
+                archive.writestr("calendar.txt", "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\n001,1,1,1,1,1,0,0,20260901,20260930\n")
+                archive.writestr("calendar_dates.txt", "service_id,date,exception_type\n")
+                archive.writestr("trips.txt", "trip_id,route_id,service_id\n000123,01,001\n")
+                archive.writestr("stop_times.txt", "trip_id,stop_id,stop_sequence,arrival_time,departure_time\n000123,LAST,10,25:10:00,25:11:00\n000123,FIRST,2,24:00:00,24:01:00\n")
+            archive_schedule_zip(source, archive_root, datetime(2026, 9, 20, tzinfo=timezone.utc))
+            cutoff = datetime(2026, 9, 22, 4, 0, 0, tzinfo=timezone.utc)
+            archive_schedule_zip(source, archive_root, cutoff)
+            archive_schedule_zip(source, archive_root, cutoff.replace(microsecond=1))
+            digest = next(archive_root.glob("*/content.json")).parent.name
+            source.unlink()
+            for _ in range(2):
+                output = StringIO()
+                with redirect_stdout(output):
+                    trace_schedule.trace_from_archive(archive_root, date(2026, 9, 22), "000123", "America/New_York")
+                self.assertIn(str(archive_root / digest / "feed"), output.getvalue())
+                self.assertIn(str(cutoff) + " utc", output.getvalue())
+                self.assertIn("2 visits, starting at stop FIRST at 24:01:00 and ending at stop LAST at 25:10:00", output.getvalue())
 
 
 if __name__ == "__main__":
