@@ -11,6 +11,8 @@ from schedule_truth.gtfs_schedule import scheduled_stop_times_for_date
 from schedule_truth.select_schedule_snapshot import select_schedule_snapshot
 from schedule_truth.archive_schedule import load_schedule_snapshots, extract_schedule_zip
 
+MBTA_TIMEZONE = "America/New_York"
+
 def main(feed_path: Path, service_date: date, trip_id: str):
 
 
@@ -33,12 +35,16 @@ def main(feed_path: Path, service_date: date, trip_id: str):
         print('The trip is not scheduled on this date.')
 
 def trace_from_archive(archive_root: Path, service_date: date, trip_id: str, agency_timezone: str):
+     if agency_timezone != MBTA_TIMEZONE:
+         raise ValueError(f"MBTA traces require {MBTA_TIMEZONE}, got {agency_timezone!r}.")
      snapshots = load_schedule_snapshots(archive_root)
-     res = select_schedule_snapshot(service_date, snapshots, agency_timezone)
+     res = select_schedule_snapshot(service_date, snapshots, MBTA_TIMEZONE)
      if res['status'] == 'unresolved':
          print("There are no eligible snapshots.")
          return 
      else:
+         if res["snapshot"].get("agency_timezone") != MBTA_TIMEZONE:
+             raise ValueError("Selected archive timezone does not match the MBTA timezone.")
          zip_sha256 = res["snapshot"]['zip_sha256']
      feed_path = extract_schedule_zip(archive_root, zip_sha256)
      print(f"The selected path is {feed_path}, downloaded at {res['snapshot']['downloaded_at_utc']} utc.")

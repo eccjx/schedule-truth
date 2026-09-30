@@ -49,7 +49,7 @@ def archive_schedule_zip(
                         feed_start_date = None
                         feed_end_date = None
                         coverage_error = "start date is greater than end date"
-        except (KeyError, IndexError, ValueError) as error:
+        except (KeyError, IndexError, ValueError, csv.Error) as error:
             feed_start_date = None
             feed_end_date = None
             coverage_error = f"missing or invalid coverage: {error}"
@@ -152,8 +152,12 @@ def load_schedule_snapshots(archive_root: Path) -> list[dict]:
 
 def extract_schedule_zip(archive_root: Path, zip_sha256: str) -> Path:
     content_path = archive_root / zip_sha256
+    zip_path = content_path / "original.zip"
+    actual_sha256 = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+    if actual_sha256 != zip_sha256:
+        raise ValueError(f"Archived ZIP hash does not match {zip_sha256}: {actual_sha256}")
     feed_path = content_path / "feed"
-    with zipfile.ZipFile(content_path / "original.zip") as archive:
+    with zipfile.ZipFile(zip_path) as archive:
         for member in archive.infolist():
             destination = feed_path / member.filename
             if not destination.resolve().is_relative_to(feed_path.resolve()):

@@ -1,6 +1,6 @@
 # Schedule snapshot selection
 
-Status: ACCEPTED by the author on 2026-09-24, with the coverage-retention refinement accepted on 2026-09-28. Selection and local archiving are partially implemented; see CURRENT_STATE.md for verified feature status.
+Status: ACCEPTED by the author on 2026-09-24, with the coverage-retention refinement accepted on 2026-09-28. Selection, local archiving, one-request HTTP collection, and persisted tracing are verified; Phase 1's local collection/versioning scope was author accepted on 2026-09-30. Persistent reports/revisions and operational hardening remain unfinished; see CURRENT_STATE.md for verified feature status.
 
 ## Original report for service date D
 
@@ -27,7 +27,21 @@ For this first version, use `feed_start_date` and `feed_end_date` from `feed_inf
 
 Accepted archive refinement on 2026-09-28: retain the original ZIP and each receipt even when coverage is unknown. Persist both coverage dates as null and a nonempty `coverage_error`. Coverage strings must be exactly eight ASCII digits in YYYYMMDD form, parse to real dates, and form a non-reversed range. Retaining evidence does not make it eligible.
 
-Accepted agency handling on 2026-09-29: choose the MBTA row rather than the first `agency.txt` row. For a missing MBTA row or missing/invalid MBTA timezone, retain the ZIP and receipt, store `America/New_York` as a configured fallback, and record source and reason. Duplicate MBTA rows and corrupt-ZIP persistence remain undecided. Automatic retained-ZIP integrity checking is deferred and prevents Phase 1 acceptance while the known mismatch remains; see `docs/FAILURE_MODES.md`.
+Accepted agency handling on 2026-09-29: choose the MBTA row rather than the first `agency.txt` row. For a missing MBTA row or missing/invalid MBTA timezone, retain the ZIP and receipt, store `America/New_York` as a configured fallback, and record source and reason. Duplicate MBTA rows remain undecided. Retained ZIP hash verification was implemented on 2026-09-30; extracted files are not independently verified. See `docs/FAILURE_MODES.md`.
+
+## Static-feed fetch attempts and invalid downloads
+
+Accepted by the author on 2026-09-30 for the planned MBTA HTTP collector. Record a separate attempt for every HTTP request, including each retry. Create its identity and record the request URL and UTC attempt time before fetching; finish it with an outcome and error or a link to received content. A failed request that yields no bytes has an attempt/error record but no content hash or download receipt.
+
+If bytes are received but cannot be opened as a valid ZIP, retain those exact bytes under their SHA-256 hash and link them to the failed attempt with the ZIP-validation error. Such bytes have no selectable schedule content metadata or successful download receipt and must not be used for tracing. A validated ZIP follows the normal archive path: content metadata and a distinct receipt linked to the successful attempt. Repeated requests remain separate attempts even if they receive identical bytes.
+
+The one-request collector's attempt-file format and normal write ordering are implemented and tested. Crash-recovery behavior remains undecided and unverified; the writes are not a transaction. This policy does not redefine the existing behavior for a valid ZIP with missing coverage or invalid agency metadata. Retained ZIP hash mismatch is now detected before extraction; automatic repair remains undefined.
+
+Accepted refinement on 2026-09-30: if an HTTP request returns an error status or transport error together with bytes that happen to form a readable ZIP, the request still failed. Retain the exact bytes, their hash, request error, and attempt record for investigation, but create no successful receipt and do not make that ZIP selectable. The readability of the response body does not override the failed request outcome.
+
+## MBTA timezone consistency in archived traces
+
+Accepted by the author on 2026-09-30: this first version is MBTA-only and uses the configured `America/New_York` timezone to determine the original-report local-midnight cutoff. A caller must not silently substitute a different timezone. After selection, the chosen archive's persisted `agency_timezone` must agree with the configured MBTA timezone; a mismatch is an explicit trace error, not a reason to silently change the cutoff or select another archive. The selected archive's timezone source and any fallback reason remain available in its content metadata.
 
 ## Archive identity and trace input
 

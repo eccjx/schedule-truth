@@ -1,6 +1,7 @@
 """Archive contract checks using tiny deterministic ZIPs and isolated storage."""
 
 from datetime import date, datetime, timedelta, timezone
+import csv
 import hashlib
 import json
 import os
@@ -70,6 +71,21 @@ class ArchiveScheduleTests(unittest.TestCase):
         self.assertNotIn("coverage_error", result["content"])
         self.assert_persisted(result, self.source, self.received)
         self.assertEqual(self.source.read_bytes(), before)
+
+    def test_oversized_coverage_csv_retains_unknown_coverage_and_receipt(self):
+        oversized = '9' * (csv.field_size_limit() + 1)
+        source = write_zip(self.root / 'oversized.zip',
+                           feed=f'feed_start_date,feed_end_date\n{oversized},20260930\n')
+        result = archive_schedule_zip(source, self.archive, self.received)
+        self.assert_persisted(result, source, self.received)
+        self.assertIsNone(result['content']['feed_start_date'])
+        self.assertIsNone(result['content']['feed_end_date'])
+        self.assertIn('field larger than field limit', result['content']['coverage_error'])
+        snapshots = load_schedule_snapshots(self.archive)
+        self.assertEqual(len(snapshots), 1)
+        self.assertEqual(snapshots[0]['receipt_id'], result['receipt']['receipt_id'])
+        selected = select_schedule_snapshot(date(2026, 9, 22), snapshots, 'America/New_York')
+        self.assertEqual(selected['status'], 'unresolved')
 
     def test_load_restores_one_typed_snapshot_per_receipt(self):
         first = archive_schedule_zip(self.source, self.archive, self.received)
@@ -148,9 +164,9 @@ class ArchiveScheduleTests(unittest.TestCase):
         self.assertEqual(zip_path.read_bytes(), original)
 
     def test_extract_does_not_write_outside_feed(self):
-        saved = archive_schedule_zip(self.source, self.archive, self.received)
-        with zipfile.ZipFile(saved['content']['zip_path'], 'a') as archive:
+        with zipfile.ZipFile(self.source, 'a') as archive:
             archive.writestr('../outside.txt', 'must not escape')
+        saved = archive_schedule_zip(self.source, self.archive, self.received)
         with self.assertRaisesRegex(ValueError, 'outside feed directory'):
             extract_schedule_zip(self.archive, saved['content']['zip_sha256'])
         self.assertFalse((saved['content']['zip_path'].parent / 'outside.txt').exists())

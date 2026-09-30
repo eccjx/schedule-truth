@@ -1,66 +1,60 @@
 # Current Project State
 
-Last updated: 2026-09-29. Base revision: `2389875` on `main`, with uncommitted code, tests, and documentation.
+Last updated: 2026-09-30. Base: `b11ddb8` on `main`, plus uncommitted collector, archive/trace fixes, tests, and documentation. Acceptance applies to this working tree, not HEAD alone.
 
 ## Current Phase
 
-Phase 0 GTFS foundations are substantially implemented but not formally accepted. Phase 1 static schedule versioning now has local ZIP/receipt archiving, snapshot selection, persisted metadata loading, extraction, and a demonstrated real retained-ZIP trace. The HTTP collector, corrupt-ZIP/fetch-failure policy, report revisions, and independent review remain. Phase 1 is not accepted.
+**Phase 1 accepted by the author on 2026-09-30** against the four completion criteria in `ROADMAP.md`: identical downloads share one content identity, changed bytes create separate versions, historical ZIPs are preserved, and persisted metadata is queryable. Phase 0 foundations are substantially implemented but formal acceptance remains separate. Phase 2 realtime collection is next; no realtime implementation is present.
+
+Acceptance does not establish continuous static polling, automatic retry, crash recovery, extraction-cache verification, or persistent original-report/revision records. These remain follow-ups rather than additional Phase 1 acceptance gates.
 
 ## Completed and Tested Scope
 
-- Earlier commits `12e9221`, `18fbe60`, `3ddd08e`, `ac8c2ba`, and `10f93fe` provide schedule helpers, normalization/loaders, selection, and the parameterized trace.
-- `2389875` provides SHA-256 local ZIP archiving, content JSON, separate UTC receipt JSON, and strict coverage parsing. Repeated identical bytes retain one content identity and separate receipts in tested cases.
-- Current working code selects the MBTA `agency.txt` row even when another agency comes first. Missing/invalid MBTA timezone uses the recorded `America/New_York` fallback. The archive loader restores typed content and receipt metadata; extraction uses a hash-named `feed/` directory; `trace_from_archive` selects from persisted receipts.
-- A real MBTA ZIP received on 2026-09-29 at approximately 11:35 PDT (18:35 UTC, supplied only to minute precision) was archived under SHA-256 `e3fdffe291bbe715d09356c1f2ceb58c8fc0781478e4041ba46160d964723133`. Receipt `2851b820e5764bf29ce9f1a8931a2ecc` and content metadata are present. The retained ZIP hash was independently recomputed and matched. A 2026-09-30 trace of trip `78942566` used that archive and returned 45 visits, stop `1747` at `19:10:00` through stop `797` at `20:03:00`.
-- The accepted missing/invalid coverage-retention and MBTA-row/fallback decisions are recorded in the snapshot decision and plan. `data/` is ignored by Git; the real ZIP/archive are local evidence, not tracked project files.
+- Schedule helpers, service-date resolution, normalization/loaders, selection, and parameterized tracing are implemented across earlier commits and the current working tree.
+- Local archives retain ZIP bytes under SHA-256 identity, content metadata, and separate aware-UTC receipts. Invalid/missing coverage yields null dates and diagnostics; such snapshots are ineligible for historical selection.
+- MBTA agency-row selection and recorded `America/New_York` fallback are implemented. Historical selection uses the latest eligible receipt by MBTA-local midnight. Caller or selected-archive timezone mismatches explicitly fail.
+- The one-request HTTP collector persists attempts and outcomes. Invalid ZIP bytes and bodies accompanying request failures remain evidence without successful receipts or selectable schedule metadata. Unsupported/encrypted ZIP validation and oversized coverage CSV cases have regressions.
+- Retained ZIP SHA-256 is recomputed before extraction. Replaced bytes are rejected; the formerly failing integrity regression passes. Existing extracted files remain trusted.
+- Two real MBTA HTTPS collections on September 30 returned identical 24,684,859-byte ZIPs: one content identity, two attempts and receipts. SHA-256: `da552d2330c9b85c2ad7ddb5d71012bb9539b2ba5b822d7000d7a3606ec79296`. Receipt times: `2026-09-30T22:13:16.048740+00:00` and `2026-09-30T22:13:41.783124+00:00`. Coverage: September 22–December 12, 2026.
+- Persisted selection for October 1 chose the second receipt. Trip `78942566` traced 45 visits, stop `1747` at `19:10:00` through stop `797` at `20:03:00`. Independent inspection verified retained bytes and all 32 extracted ZIP members. Archives are Git ignored and do not travel with source commits.
+- The earlier September 29 archive/September 30 trace remain local evidence; their supplied download time was only known to the minute. New collector receipts record observed UTC timestamps at microsecond resolution.
 
 ## In Progress
 
-- A one-fetch HTTP collector has not been built. No persisted original-report/revision identity or current-versus-prior revision retrieval exists.
-- Source timezone is stored with content, while `trace_from_archive` still takes an independent `agency_timezone` argument. The intended handling of a mismatch needs author review.
-- The real archive proves one eligible service-date/trip path. It does not prove continuous collection, all feed layouts, or automatic archive integrity checks.
+- Phase 2 contract and first realtime collector slice are not implemented. The roadmap calls for Vehicle Positions, Trip Updates, and Service Alerts, preserving exact protobuf payloads and request evidence locally.
+- Original-report/revision persistence remains unfinished under the accepted snapshot design.
+- Static collection remains one request per call; periodic invocation, retries, and operational recovery are not demonstrated.
 
-## Blocked and Known Failure
+## Blocked and Known Limits
 
-- **Phase 1 acceptance is blocked by one known red integrity test.** If `<hash>/original.zip` is replaced with different valid ZIP bytes, extraction can trace the replacement while reporting the old hash and receipt. The author explicitly deferred automatic integrity detection on 2026-09-29; the failing regression remains in place and is documented in `FAILURE_MODES.md`.
-- Corrupt-ZIP and partial-persistence outcomes are not yet decided. The current archiver writes bytes before ZIP/metadata validation, so a failure can leave bytes without a receipt.
+- No remaining failing Phase 1 test blocks the accepted scope.
+- Existing extracted `feed/` files are trusted. Changed cached CSVs can affect a trace despite a valid retained ZIP; recreate disposable extraction from the verified ZIP when in doubt. Automatic comparison/rebuild remains unfinished.
+- Writes are not transactional. Interruptions/storage failures can leave started attempts, staged bytes, temporary JSON, or unlinked receipts. Recovery and concurrency guarantees are not established.
 
 ## Needs Verification
 
-- The latest full suite has one failure, so the current working revision is not green or independently reviewed. Multiple MBTA rows, multiple `feed_info.txt` rows, malformed persisted metadata recovery, interrupted writes, concurrency, and performance remain outside established contracts.
-- The receipt timestamp for the real download is only known to the minute. Saved `:00` seconds and zero microseconds represent the supplied minute; they were not observed with finer precision.
-- The Phase 0 command-line entry point still hardcodes one example although its Python function accepts a date. Phase 0 acceptance is the author's decision.
-- `C:\Python314\python.exe` lacks IANA timezone data; Conda Python works. No project dependency declaration yet ensures reproducibility in both environments.
+- Source changes include untracked collector/tests; a committed revision is needed to reproduce acceptance from another checkout. Ignored data and private evidence remain local.
+- Duplicate MBTA rows, multiple feed-info rows, oversized agency CSV, malformed metadata recovery, and performance remain outside established contracts.
+- Conda Python loads timezone data; `C:\Python314\python.exe` lacks it. Package/dependency declarations are absent. Phase 0's command-line example hardcodes a date. `README.md`, `DATA_MODEL.md`, and `LEARNING.md` remain empty.
+- Continuous operation and restart preservation must be demonstrated for Phase 2; static one-request success does not establish these guarantees.
 
 ## Test Status
 
-- **FAIL:** `C:\Users\EricChen\miniconda3\python.exe -B -m unittest discover -s tests -q` on 2026-09-29 ran 90 tests with one failure: `test_mismatched_retained_zip_cannot_be_traced_under_old_hash`. The test deliberately replaces retained ZIP bytes and exposes false hash provenance.
-- **PASS (handoff):** the archive-specific suite ran 18 tests after the author's missing-MBTA error-message fix. Earlier full-suite results with two failures predate that fix.
-- **PASS (reported real check):** persisted ZIP/receipt selection, extraction, and the 45-visit September 30 MBTA trace; retained ZIP SHA-256 recomputation independently matches metadata.
-- **NOT RUN:** a new independent review after the final working-tree changes; HTTP collector tests; corrupt-ZIP persistence tests; lint.
+- **PASS, independently rerun 2026-09-30:** `C:\Users\EricChen\miniconda3\python.exe -B -m unittest discover -s tests -q` — 112 tests, OK, including retained-ZIP mismatch.
+- **PASS, recorded live evidence and independent persisted inspection:** two real HTTPS downloads, separate receipts/shared content, retained hash, 32 cached members, and October 1 persisted trace.
+- Current archive, collector, and trace source SHA-256 values match the independent acceptance review.
+- **NOT RUN in this reconciliation:** new network fetch, continuous polling, process-kill/storage-failure recovery, concurrency, lint, and default-Python portability. Earlier live observations are distinct from this session's suite rerun.
 
 ## Important Findings and Learning
 
-- Independent synthetic tests confirm persisted receipts, cutoff selection, repeated-content receipt identity, unresolved outcomes, and deterministic archive tracing within tested scope.
-- The real ZIP has Cape Cod Regional Transit Authority first and MBTA second; selecting the first agency row would have been an unsupported assumption. The author corrected MBTA-row selection and verified the fallback reason for a missing MBTA row.
-- The trace prints a selected path and receipt, but derived report records and revision IDs are not persisted. An altered retained ZIP can undermine the printed provenance.
-- `README.md`, `DATA_MODEL.md`, and `LEARNING.md` remain empty; Python package/dependency setup is absent.
+Content identity differs from request/receipt identity: identical bytes still carry separate availability evidence. Retained-ZIP validation does not authenticate cached CSVs. Realtime work must separate event/feed timestamps from request/receipt timestamps; missing observations must not imply missing transit service.
 
 ## Next Recommended Work
 
-### Human-led engineering
-
-1. MUST — With Mentor, decide and document what a corrupt ZIP and failed static-feed fetch retain: attempted request, received bytes, content record, receipt, and error. Implement the bounded archive/collector behavior after the outcomes are explicit. Stop when examples cannot leave an ambiguous unrecorded partial attempt.
-2. SHOULD — Define the source of agency timezone for historical trace selection from persisted metadata and the outcome when a caller-supplied value disagrees. Stop when one trace cannot silently use a timezone inconsistent with its archived schedule evidence.
-3. STRETCH — Sketch stable original-report and later-revision identities linked to selected hash and receipt. Stop at a small example showing that a later schedule cannot silently overwrite the original.
-
-### Verification and support work
-
-- Builder (proposed, after failure outcomes): implement bounded HTTP/retry/CLI and dependency plumbing without choosing collector failure semantics.
-- Tester (proposed, after the author's handling): test corrupt ZIP/fetch failure artifacts and timezone mismatch; keep the deferred retained-ZIP identity regression visible.
-- Reviewer (proposed): independently assess the current archive/trace path, accepted decisions, failure handling, and remaining Phase 1 criteria; report actionable findings.
-- Planner: this state reconciles the September 29 handoffs, real archive evidence, and the current 90-test run. Proposed support work was not launched here.
+1. Define the first realtime collection contract using Vehicle Positions: attempt/payload identity, timestamp meanings, failure evidence, and minimum restart-preservation boundary. These decisions remain proposed until accepted.
+2. Build a single-feed polling slice with immutable raw protobuf storage; verify duplicates, failed requests, and stop/restart behavior.
+3. Expand to Trip Updates and Service Alerts before Phase 2 acceptance. Roadmap polling intervals are adjustable suggestions, not an accepted operational contract.
 
 ## Roadmap Impact
 
-Phase 1 has advanced from local archiving to a real versioned static trace, but continuous collection and safe failure behavior remain. The deferred integrity defect blocks Phase 1 acceptance. Realtime collection and later reconstruction, analytics, replay, and operational work remain ahead under the accepted roadmap.
+Phase 1 collection/versioning is author accepted within its explicit local scope. Phase 2 adds continuous realtime evidence capture and restart preservation. Raw-layer/manifest completion, normalization, feed health, reconciliation, reconstruction, replay, analytics, and operations remain ahead. Static scheduling, cache integrity, and report persistence remain visible follow-ups.

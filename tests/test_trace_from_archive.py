@@ -24,6 +24,7 @@ class TraceFromArchiveTests(unittest.TestCase):
         self.selected = {
             "zip_sha256": "b" * 64, "downloaded_at_utc": self.receipt,
             "feed_start_date": date(2026, 9, 1), "feed_end_date": date(2026, 9, 30),
+            "agency_timezone": "America/New_York",
         }
         self.loader = patch.object(trace_schedule, "load_schedule_snapshots", return_value=[self.selected]).start()
         self.extractor = patch.object(
@@ -61,6 +62,22 @@ class TraceFromArchiveTests(unittest.TestCase):
         self.extractor.assert_not_called()
         self.assertIn("no eligible snapshots", output.getvalue().lower())
         self.assertNotIn("selected path", output.getvalue().lower())
+
+    def test_wrong_caller_timezone_is_rejected_before_loading(self):
+        with self.assertRaisesRegex(ValueError, "MBTA traces require"):
+            trace_schedule.trace_from_archive(self.root, self.day, self.trip, "America/Los_Angeles")
+        self.loader.assert_not_called()
+        self.extractor.assert_not_called()
+
+    def test_selected_archive_timezone_mismatch_is_rejected_before_extraction(self):
+        mismatched = dict(self.selected, agency_timezone="America/Chicago")
+        with patch.object(trace_schedule, "select_schedule_snapshot", return_value={
+            "status": "selected", "snapshot": mismatched,
+        }), patch.object(trace_schedule, "main") as main:
+            with self.assertRaisesRegex(ValueError, "Selected archive timezone"):
+                trace_schedule.trace_from_archive(self.root, self.day, self.trip, "America/New_York")
+        self.extractor.assert_not_called()
+        main.assert_not_called()
 
     def test_real_selector_routes_newest_eligible_snapshot_to_main(self):
         older = dict(self.selected, zip_sha256="a" * 64,
