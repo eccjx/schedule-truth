@@ -1,0 +1,3 @@
+# GTFS Realtime schema and Protobuf decoder
+gtfs-realtime-bindings==3.0.0
+protobuf>=7.34.0,<8
