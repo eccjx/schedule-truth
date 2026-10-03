@@ -25,4 +25,6 @@ If a staging file contains only partial bytes at restart, record that the file e
 
 ## Still open
 
-The exact polling interval, response-size limits, persistent storage layout, and the detection/reconciliation mechanics for interrupted writes remain to be designed. A successful HTTP response is not by itself evidence that the feed or individual vehicle observations are fresh. This contract covers the first Vehicle Positions slice only; Trip Updates and Alerts follow later.
+The finite collector stores separate `requests/<id>.json` records, transient `.part` staging, and immutable complete `payloads/<sha256>/response.pb` artifacts. Startup reconciliation implements the bounded interrupted-request rule above. These mechanics are tested and independently reviewed; they do not establish general crash or power-loss recovery.
+
+Production polling cadence, response-size limits, continuous operation, retry/backoff, broader recovery, single-writer enforcement, and stored-payload tamper detection remain open. Clean dependency installation is unverified; current passing runs use a local vendor directory. A successful HTTP response is not by itself evidence that the feed or individual vehicle observations are fresh. This contract covers the first Vehicle Positions slice only; Trip Updates and Alerts follow later.
