@@ -1,6 +1,6 @@
 # Vehicle Positions continuous runner contract
 
-Status: author-accepted Vehicle Positions continuous runner slice, 2026-10-02. Implementation, independent tests, and review passed in the working tree; the code is not yet committed. This extends the [first collection slice](vehicle-positions-first-slice.md); it does not change its request, payload, or timestamp meanings. This is not Phase 2 milestone acceptance.
+Status: author-accepted Vehicle Positions continuous runner slice, 2026-10-02. Implementation, independent tests, and review passed; source/tests are committed in `f19750a`. This extends the [first collection slice](vehicle-positions-first-slice.md); it does not change its request, payload, or timestamp meanings. This is not Phase 2 milestone acceptance.
 
 ## Normal operation
 
