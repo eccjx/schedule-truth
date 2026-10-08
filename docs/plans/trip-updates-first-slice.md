@@ -1,6 +1,6 @@
 # Trip Updates first collection slice
 
-Status: author-accepted Trip Updates collector/runner slice, 2026-10-07. The compact-record revision, independent tests, one live persisted poll, and independent review support this bounded acceptance. Source and tests remain uncommitted in the working tree. This is not Phase 2 milestone acceptance.
+Status: author-accepted Trip Updates collector/runner slice, 2026-10-07. The compact-record revision, independent tests, one live persisted poll, and independent review support this bounded acceptance. Source and tests are committed in `ebbd0fe`. This is not Phase 2 milestone acceptance.
 
 ## Observed sample
 
