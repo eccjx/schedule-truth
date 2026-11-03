@@ -5,6 +5,7 @@ def select_active_trips(
     trip_rows: list[dict],
     active_service_ids: set[str],
 ) -> list[dict]:
+    """Keep trips whose service ID is active on the chosen date."""
     return [x for x in trip_rows if x['service_id'] in active_service_ids]
 
 def group_trip_stop_times(
@@ -12,6 +13,7 @@ def group_trip_stop_times(
     stop_time_rows: list[dict],
 ) -> dict[str, list[dict]]:
     
+    """Group stop-time rows by selected trip ID and sort each group by stop sequence."""
     res = defaultdict(list)
     for trip in selected_trips:
         res[trip['trip_id']] = []

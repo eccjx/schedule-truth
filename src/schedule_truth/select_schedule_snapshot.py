@@ -6,7 +6,9 @@ def select_schedule_snapshot(
     snapshots: list[dict],
     agency_timezone: str,
 ) -> dict:
+    """Select the latest covering snapshot received by local service-date midnight, or report unresolved."""
     def utc_check(dt) -> bool:
+       """Return True when the datetime is naive or has a nonzero UTC offset."""
        return dt.tzinfo is None or dt.tzinfo.utcoffset(dt).total_seconds() != 0
 
 

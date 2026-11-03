@@ -1,6 +1,7 @@
 from datetime import date
 
 def active_service_ids(service_date: date,calendar_rows: list[dict],exception_rows: list[dict]) -> set[str]:
+    """Return service IDs enabled by the weekly calendar and date-specific exceptions."""
     active = set()
     day_name = service_date.strftime("%A").lower()
     for row in calendar_rows:

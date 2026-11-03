@@ -16,6 +16,7 @@ from schedule_truth.vehicle_positions_ownership import own_archive
 def run_trip_updates(url, root, interval_seconds=30, timeout=30,
                      max_response_bytes=10 * 1024 * 1024, stop_event=None,
                      request_deadline_seconds=120):
+    """Own a dedicated Trip Updates archive, recover it, and poll sequentially until stopped."""
     parts = urlsplit(url)
     if parts.scheme not in ('http', 'https') or not parts.hostname:
         raise ValueError('A complete HTTP or HTTPS URL is required.')
@@ -43,6 +44,7 @@ def run_trip_updates(url, root, interval_seconds=30, timeout=30,
 
 
 def main():
+    """Parse Trip Updates runner options and install graceful-shutdown signal handlers."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', required=True)
     parser.add_argument('--root', required=True, type=Path)
@@ -54,6 +56,7 @@ def main():
     stop = threading.Event()
 
     def request_stop(signum, frame):
+        """Prevent further polls while allowing the active request to finish within its existing deadline."""
         stop.set()
 
     previous = {}

@@ -14,6 +14,7 @@ _guard = threading.Lock()
 
 @contextmanager
 def own_archive(root: Path):
+    """Hold exclusive Windows writer ownership for this archive until the context exits."""
     if os.name != 'nt':
         raise RuntimeError('Archive ownership currently requires Windows.')
     key = os.path.normcase(str(root.resolve()))

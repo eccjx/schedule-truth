@@ -21,6 +21,7 @@ from schedule_truth.vehicle_positions_job import create_transport_job, close_tra
 
 
 def _save_request(path: Path, record: dict):
+    """Write request JSON to a temporary file, then replace its destination."""
     temporary = path.with_suffix('.json.tmp')
     with temporary.open('w', encoding='utf-8') as file:
         json.dump(record, file, indent=4)
@@ -28,6 +29,7 @@ def _save_request(path: Path, record: dict):
 
 
 def recover_started_requests(root: Path):
+    """Mark unfinished requests interrupted, record partial sizes, and discard partial staging files."""
     for path in (root / 'requests').glob('*.json'):
         with path.open(encoding='utf-8') as file:
             record = json.load(file)
@@ -46,6 +48,7 @@ def recover_started_requests(root: Path):
 
 
 def _receive_with_deadline(url, staging, timeout, max_response_bytes, deadline):
+    """Run HTTP reception in a killable Windows worker until the absolute monotonic deadline."""
     expired = {'complete': False, 'request_error': 'request_deadline_exceeded'}
     if time.monotonic() >= deadline:
         return expired
@@ -91,6 +94,7 @@ def _receive_with_deadline(url, staging, timeout, max_response_bytes, deadline):
 
 
 def _receive_vehicle_positions(url, staging, timeout, max_response_bytes, worker=False):
+    """Stream HTTP bytes to staging with a size cap and return completion, status, and error details."""
     parts = urlsplit(url)
     res = {}
     connection = None
@@ -159,6 +163,7 @@ def _receive_vehicle_positions(url, staging, timeout, max_response_bytes, worker
 def _poll_vehicle_positions(url: str, root: Path, timeout: float,
                             max_response_bytes: int = 10 * 1024 * 1024,
                             request_deadline_seconds: float | None = None) -> dict:
+    """Record one poll, retain complete payloads, and save failure or validated snapshot metadata."""
     parts = urlsplit(url)
     request_id = uuid4().hex
     path = root / 'requests' / f'{request_id}.json'
@@ -233,6 +238,7 @@ def _poll_vehicle_positions(url: str, root: Path, timeout: float,
 
 def collect_vehicle_positions(url: str, root: Path, interval_seconds: float, polls: int,
                               timeout: float = 30) -> list[dict]:
+    """Own the archive, recover unfinished requests, and return results from a finite number of polls."""
     parts = urlsplit(url)
     if parts.scheme not in ('http', 'https') or not parts.hostname:
         raise ValueError('A complete HTTP or HTTPS URL is required.')

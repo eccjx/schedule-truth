@@ -21,6 +21,7 @@ class ExtendedLimits(ctypes.Structure):
 
 
 def _kernel():
+    """Load the Windows job APIs with the argument and return types required by ctypes."""
     kernel = ctypes.WinDLL('kernel32', use_last_error=True)
     kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
     kernel.CreateJobObjectW.restype = wintypes.HANDLE
@@ -36,6 +37,7 @@ def _kernel():
 
 
 def create_transport_job():
+    """Create a Windows job that kills its worker when the last job handle closes."""
     kernel = _kernel()
     name = 'schedule-truth-vp-transport-' + uuid4().hex
     handle = kernel.CreateJobObjectW(None, name)
@@ -51,6 +53,7 @@ def create_transport_job():
 
 
 def join_transport_job(name):
+    """Attach the current worker process to the runner-owned Windows job."""
     kernel = _kernel()
     handle = kernel.OpenJobObjectW(1, False, name)  # JOB_OBJECT_ASSIGN_PROCESS
     if not handle:
@@ -64,4 +67,5 @@ def join_transport_job(name):
 
 
 def close_transport_job(handle):
+    """Close the runner job handle, terminating attached workers when it is the last handle."""
     _kernel().CloseHandle(handle)

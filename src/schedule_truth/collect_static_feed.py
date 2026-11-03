@@ -15,6 +15,7 @@ from schedule_truth.archive_schedule import archive_schedule_zip
 
 
 def collect_static_feed(url: str, archive_root: Path, timeout: float = 30) -> dict:
+    """Record one HTTP attempt, retain received bytes, and archive a valid ZIP only after request success."""
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise ValueError("A complete HTTP or HTTPS feed URL is required.")

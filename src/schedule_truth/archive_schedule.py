@@ -13,7 +13,9 @@ def archive_schedule_zip(
     archive_root: Path,
     downloaded_at_utc: datetime,
 ) -> dict:
+    """Retain a ZIP by its hash, save coverage/timezone metadata, and create a separate receipt."""
     def utc_check(dt) -> bool:
+           """Return True when the datetime lacks an offset or has a nonzero UTC offset."""
            offset = dt.utcoffset()
            return offset is None or offset.total_seconds() != 0    
     if utc_check(downloaded_at_utc):
@@ -123,6 +125,7 @@ def archive_schedule_zip(
 
 
 def load_schedule_snapshots(archive_root: Path) -> list[dict]:
+    """Join each receipt to its content metadata, restoring date, UTC datetime, and path objects."""
     res = []
     for receipt_path in (archive_root / "receipts").glob("*.json"):
         with receipt_path.open("r", encoding="utf-8") as file:
@@ -151,6 +154,7 @@ def load_schedule_snapshots(archive_root: Path) -> list[dict]:
 
 
 def extract_schedule_zip(archive_root: Path, zip_sha256: str) -> Path:
+    """Verify the archived ZIP hash and extract into feed/ without replacing existing files."""
     content_path = archive_root / zip_sha256
     zip_path = content_path / "original.zip"
     actual_sha256 = hashlib.sha256(zip_path.read_bytes()).hexdigest()

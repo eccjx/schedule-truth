@@ -16,6 +16,7 @@ MBTA_TIMEZONE = "America/New_York"
 def main(feed_path: Path, service_date: date, trip_id: str):
 
 
+    """Load a feed directory and print a trip summary for the requested service date."""
     calendar_rows = load_calendar_rows(feed_path / "calendar.txt")
     calendar_dates_rows = load_calendar_exception_rows(feed_path / "calendar_dates.txt")
     trip_rows = load_trip_rows(feed_path / "trips.txt")
@@ -35,6 +36,7 @@ def main(feed_path: Path, service_date: date, trip_id: str):
         print('The trip is not scheduled on this date.')
 
 def trace_from_archive(archive_root: Path, service_date: date, trip_id: str, agency_timezone: str):
+     """Select and extract an eligible MBTA archive, then print the requested trip summary."""
      if agency_timezone != MBTA_TIMEZONE:
          raise ValueError(f"MBTA traces require {MBTA_TIMEZONE}, got {agency_timezone!r}.")
      snapshots = load_schedule_snapshots(archive_root)

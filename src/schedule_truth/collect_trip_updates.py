@@ -17,6 +17,7 @@ def persist_trip_updates_response(
     request_started_at_utc: datetime,
     received_at_utc: datetime,
 ) -> dict:
+    """Save exact Trip Updates bytes and compact request evidence, rejecting conflicting replays."""
     digest = hashlib.sha256(body).hexdigest()
     if not request_id or Path(request_id).name != request_id or '/' in request_id or '\\' in request_id:
         raise ValueError('request_id must be a filename component.')
@@ -96,6 +97,7 @@ def persist_trip_updates_response(
 
 def poll_trip_updates(url, root, timeout=30, max_response_bytes=10 * 1024 * 1024,
                       request_deadline_seconds=120):
+    """Persist one deadline-limited poll and its outcome; the caller must hold archive ownership."""
     request_id = uuid4().hex
     path = root / 'requests' / f'{request_id}.json'
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,5 @@
 def parse_gtfs_time(value: str) -> int:
+    """Convert a GTFS time to seconds from service-day midnight, allowing hours beyond 23."""
     parts = value.split(":")
     if len(parts) != 3:
         raise ValueError(f"Invalid GTFS time: {value!r}")

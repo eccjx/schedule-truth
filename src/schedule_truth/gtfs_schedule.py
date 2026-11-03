@@ -13,6 +13,7 @@ def scheduled_stop_times_for_date(
     trip_rows: list[dict],
     stop_time_rows: list[dict],
 ) -> dict[str, list[dict]]:
+    """Return active trips and their stop-time rows in sequence order for one service date."""
     active_id = active_service_ids(service_date, calendar_rows, exception_rows)
 
     active_trips = select_active_trips(trip_rows, active_id)

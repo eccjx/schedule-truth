@@ -14,6 +14,7 @@ from schedule_truth.vehicle_positions_ownership import own_archive
 def run_vehicle_positions(url: str, root: Path, interval_seconds: float = 15,
                           timeout: float = 30, max_response_bytes: int = 10 * 1024 * 1024,
                           stop_event=None, request_deadline_seconds: float = 120):
+    """Own and recover the archive, then poll sequentially with a wait after each request until stopped."""
     parts = urlsplit(url)
     if parts.scheme not in ('http', 'https') or not parts.hostname:
         raise ValueError('A complete HTTP or HTTPS URL is required.')
@@ -36,6 +37,7 @@ def run_vehicle_positions(url: str, root: Path, interval_seconds: float = 15,
 
 
 def main():
+    """Parse Vehicle Positions runner options and install graceful-shutdown signal handlers."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', required=True)
     parser.add_argument('--root', required=True, type=Path)
@@ -47,6 +49,7 @@ def main():
     stop = threading.Event()
 
     def request_stop(signum, frame):
+        """Prevent further polls while allowing the active request to finish within its existing deadline."""
         stop.set()
 
     previous = {}

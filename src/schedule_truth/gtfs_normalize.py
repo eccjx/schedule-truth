@@ -2,7 +2,9 @@ from datetime import datetime
 from schedule_truth.gtfs_time import parse_gtfs_time
 
 def normalize_calendar_row(raw_row) -> dict:
+    """Copy a calendar row, converting weekday flags to booleans and dates to date objects."""
     def date_checker(date_str):
+        """Check for exactly eight ASCII digits; calendar validity is checked separately."""
         if len(date_str) != 8:
             return False
         for digit in date_str:
@@ -41,6 +43,7 @@ def normalize_calendar_row(raw_row) -> dict:
 
 
 def normalize_calendar_exception_row(raw_row: dict[str, str]) -> dict:
+    """Copy a service exception with a validated date and integer addition/removal flag."""
     res = {}
     res['service_id'] = raw_row['service_id']
 
@@ -62,6 +65,7 @@ def normalize_calendar_exception_row(raw_row: dict[str, str]) -> dict:
 
 
 def normalize_trip_row(raw_row: dict[str, str]) -> dict:
+    """Return a new dictionary containing the unchanged trip, route, and service IDs."""
     res = {}
     res['trip_id'] = raw_row['trip_id']
     res['route_id'] = raw_row['route_id']
@@ -71,6 +75,7 @@ def normalize_trip_row(raw_row: dict[str, str]) -> dict:
 
 
 def normalize_stop_time_row(raw_row: dict[str, str]) -> dict:
+    """Copy stop identifiers, convert sequence to an integer, and validate nonempty time strings."""
     res = {}
     res['trip_id'] = raw_row['trip_id']
     res['stop_id'] = raw_row['stop_id']
