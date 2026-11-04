@@ -4,12 +4,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
 import json
+import time
 from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from google.transit import gtfs_realtime_pb2
 
-from schedule_truth.collect_vehicle_positions import _save_request
+from schedule_truth.collect_vehicle_positions import _save_request, _receive_with_deadline
 
 
 def persist_alerts_response(
@@ -95,4 +96,44 @@ def persist_alerts_response(
     res['finished_at_utc'] = datetime.now(timezone.utc).isoformat()
     record_path.parent.mkdir(parents=True, exist_ok=True)
     _save_request(record_path, res)
+    return res
+
+
+def poll_alerts(url, root, timeout=30, max_response_bytes=10 * 1024 * 1024,
+                      request_deadline_seconds=120):
+    """Persist one deadline-limited poll and its outcome; the caller must hold archive ownership."""
+    request_id = uuid4().hex
+    path = root / 'requests' / f'{request_id}.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staging = path.with_suffix('.part')
+    started_monotonic = time.monotonic()
+    started = datetime.now(timezone.utc)
+    res = {}
+    res['request_id'] = request_id
+    res['feed_type'] = 'service_alerts'
+    res['request_url'] = url
+    res['request_started_at_utc'] = started.isoformat()
+    res['request_deadline_seconds'] = request_deadline_seconds
+    res['outcome'] = 'started'
+    res['valid_snapshot'] = False
+    _save_request(path, res)
+    transfer = _receive_with_deadline(url, staging, timeout, max_response_bytes,
+                                      started_monotonic + request_deadline_seconds)
+    if transfer['complete']:
+        res = persist_alerts_response(root, request_id, staging.read_bytes(),
+                                            transfer['http_status'], started,
+                                            datetime.fromisoformat(transfer['received_at_utc']))
+    else:
+        for field in ('http_status', 'observed_size_bytes'):
+            if field in transfer:
+                res[field] = transfer[field]
+        res['outcome'] = 'failed'
+        res['error'] = transfer['request_error']
+        res['partial_staging_existed'] = staging.exists()
+        res['partial_staging_size_bytes'] = staging.stat().st_size if staging.exists() else 0
+        if res['error'] == 'request_deadline_exceeded':
+            res['observed_size_bytes'] = res['partial_staging_size_bytes']
+        res['finished_at_utc'] = datetime.now(timezone.utc).isoformat()
+        _save_request(path, res)
+    staging.unlink(missing_ok=True)
     return res
